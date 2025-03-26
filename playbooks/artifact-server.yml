@@ -1,5 +1,5 @@
 - name: Install and Configure Nexus Repository
-  hosts: artifact_server
+  hosts: artifact_servers
   become: yes
   tasks:
     - name: Install Java (required for Nexus)
