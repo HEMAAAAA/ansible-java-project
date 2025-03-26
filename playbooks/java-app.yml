@@ -1,0 +1,22 @@
+- name: Configure Application Server
+  hosts: app_servers
+  become: yes
+  tasks:
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+
+    - name: Start Docker service
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Pull application image from Docker Hub
+      command: docker pull your_dockerhub_username/your_maven_app:latest
+
+    - name: Run the application container
+      command: docker run -d --name maven_app -p 8080:8080 your_dockerhub_username/your_maven_app
+

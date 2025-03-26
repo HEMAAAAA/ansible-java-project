@@ -1,0 +1,77 @@
+- name: Install and Configure Nexus Repository
+  hosts: artifact_server
+  become: yes
+  tasks:
+    - name: Install Java (required for Nexus)
+      apt:
+        name: openjdk-17-jdk
+        state: present
+        update_cache: yes
+
+    - name: Create Nexus user
+      user:
+        name: nexus
+        shell: /bin/bash
+        home: /opt/nexus
+        createhome: yes
+
+    - name: Download Nexus
+      get_url:
+        url: https://download.sonatype.com/nexus/3/latest-unix.tar.gz
+        dest: /opt/nexus.tar.gz
+
+    - name: Extract Nexus
+      unarchive:
+        src: /opt/nexus.tar.gz
+        dest: /opt/
+        remote_src: yes
+
+    - name: Rename Nexus directory
+      command: mv /opt/nexus-* /opt/nexus
+
+    - name: Change ownership to Nexus user
+      file:
+        path: /opt/nexus
+        owner: nexus
+        group: nexus
+        recurse: yes
+
+    - name: Configure Nexus to run as a service
+      copy:
+        dest: /etc/systemd/system/nexus.service
+        content: |
+          [Unit]
+          Description=Nexus Repository Manager
+          After=network.target
+
+          [Service]
+          Type=simple
+          User=nexus
+          Group=nexus
+          ExecStart=/opt/nexus/bin/nexus start
+          ExecStop=/opt/nexus/bin/nexus stop
+          Restart=always
+          LimitNOFILE=65536
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd daemon
+      command: systemctl daemon-reload
+
+    - name: Enable and Start Nexus service
+      service:
+        name: nexus
+        state: started
+        enabled: yes
+
+    - name: Wait for Nexus to fully start
+      wait_for:
+        port: 8081
+        timeout: 120
+        state: started
+
+    - name: Display Nexus Login Information
+      debug:
+        msg: "Nexus is running at http://{{ ansible_host }}:8081 (default admin credentials: admin / admin123)"
+

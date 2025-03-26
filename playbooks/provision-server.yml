@@ -1,0 +1,74 @@
+- name: Server Hardening Playbook
+  hosts: all
+  become: yes
+  tasks:
+  
+    - name: Update and upgrade all packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Disable root login in SSH
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PermitRootLogin'
+        line: 'PermitRootLogin no'
+      notify: Restart SSH
+
+    - name: Disable password authentication
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+      notify: Restart SSH
+
+    - name: Allow only specific users for SSH
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        line: 'AllowUsers ansible_user'
+      notify: Restart SSH
+
+    - name: Install and configure UFW firewall
+      apt:
+        name: ufw
+        state: present
+
+    - name: Allow only necessary ports
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "22"
+        - "8080"
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+
+    - name: Install Fail2Ban
+      apt:
+        name: fail2ban
+        state: present
+
+    - name: Set up basic Fail2Ban configuration
+      copy:
+        dest: /etc/fail2ban/jail.local
+        content: |
+          [DEFAULT]
+          bantime = 600
+          findtime = 600
+          maxretry = 5
+      notify: Restart Fail2Ban
+
+  handlers:
+    - name: Restart SSH
+      service:
+        name: ssh
+        state: restarted
+
+    - name: Restart Fail2Ban
+      service:
+        name: fail2ban
+        state: restarted
+

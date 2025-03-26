@@ -1,0 +1,66 @@
+- name: Install and Configure Prometheus and Grafana
+  hosts: monitoring_servers
+  become: yes
+  tasks:
+
+    - name: Install dependencies
+      apt:
+        name: 
+          - wget
+          - tar
+          - adduser
+          - libfontconfig1
+        state: present
+
+    - name: Download and extract Prometheus
+      get_url:
+        url: https://github.com/prometheus/prometheus/releases/latest/download/prometheus-2.47.0.linux-amd64.tar.gz
+        dest: /tmp/prometheus.tar.gz
+
+    - name: Extract Prometheus
+      unarchive:
+        src: /tmp/prometheus.tar.gz
+        dest: /opt/
+        remote_src: yes
+
+    - name: Copy Prometheus config
+      copy:
+        dest: /opt/prometheus/prometheus.yml
+        content: |
+          global:
+            scrape_interval: 15s
+
+          scrape_configs:
+            - job_name: 'app_servers'
+              static_configs:
+                - targets: ['{{ hostvars['app_server1']['ansible_host'] }}:9100']
+      notify: Restart Prometheus
+
+    - name: Download and install Grafana
+      get_url:
+        url: https://dl.grafana.com/oss/release/grafana_9.2.5_amd64.deb
+        dest: /tmp/grafana.deb
+
+    - name: Install Grafana
+      apt:
+        deb: /tmp/grafana.deb
+
+    - name: Enable and start Prometheus and Grafana
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - prometheus
+        - grafana-server
+
+  handlers:
+    - name: Restart Prometheus
+      systemd:
+        name: prometheus
+        state: restarted
+    - name: Restart Grafana
+      systemd:
+        name: grafana-server
+        state: restarted
+
